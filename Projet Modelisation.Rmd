@@ -1,0 +1,251 @@
+---
+title: "DEVOIR MODELISATION STAT"
+author: "Hady COULIBALY"
+date: "2024-03-07"
+output: html_document
+---
+
+```{r}
+install.packages("ggplot2")
+install.packages("corrplot")
+# coefficients standardisés
+install.packages("lm.beta")
+```
+
+
+# Chargement de données
+
+
+```{r}
+data= read.table("patlos_sample.csv", sep = ";", header = TRUE)
+```
+
+
+```{r}
+head(data)
+```
+
+
+```{r}
+str(data)
+```
+
+
+###################################################################
+###################################################################
+# Mettre au format catégoriel les variables qualitatives
+###################################################################
+###################################################################
+
+```{r}
+data$gender <- factor(data$gender, levels = c(0, 1), labels = c("Homme", "Femme"))
+data$diabetes <- factor(data$diabetes, levels = c(0, 1), labels = c("Non", "Oui"))
+data$bp <- factor(data$bp, levels = c(0, 1, 2), labels = c("Hypotension", "Normal", "Hypertension"))
+data$smoker <- factor(data$smoker, levels = c(0, 1), labels = c("Non", "Oui"))
+data$anticlot <- factor(data$anticlot, levels = c(0, 1, 2, 3), labels = c("Aucun", "Aspirine", "Heparine", "Warfarine"))
+data$site <- factor(data$site, levels = c(1, 2, 3, 4, 5), labels = c("0001", "0002", "0003", "0004", "0005"))
+data$cpk <- factor(data$cpk, levels = c(0, 1), labels = c("CPK normal", "CPK élevé"))
+data$comp <- factor(data$comp, levels = c(0, 1), labels = c("Non", "Oui"))
+data$choles <- factor(data$choles, levels = c(0, 1), labels = c("Normal", "Elevé"))
+data$result <- factor(data$result, levels = c( 1, 2, 3, 4), labels = c("Bon", "Stable", "Critique", "Décès"))
+data$proc <- factor(data$proc, levels = c( 0, 1, 2), labels = c("Aucun", "PTCA", "CABG"))
+
+
+# Je remplace le virgule par un point dans la variable "cost" car R ne reconnais pad les virgules
+data$cost <- gsub(",", ".", data$cost)
+data$lncost <- gsub(",", ".", data$lncost)
+
+# Je convetis la chaine de caractère en numerique
+data$cost = as.numeric(data$cost)
+data$cost = round(data$cost)   # J'arrondi les chiffre
+data$lncost = as.numeric(data$lncost) 
+```
+
+
+
+```{r}
+str(data)
+```
+
+####################################################################
+####################################################################
+# Description univariée
+####################################################################
+####################################################################
+
+
+```{r}
+
+summary(data$age)
+summary(data$cost)
+```
+
+
+```{r}
+attach(data)
+par(mfcol=c(2,2))
+hist(cost, col = "lightgreen", main= "Coût de traitement" ,xlab = NULL, ylab = NULL)
+boxplot(cost, col= "lightgreen", horizontal= TRUE)
+hist(age, col = "orange", main= "Age du patient" ,xlab = NULL, ylab = NULL)
+boxplot(age, col= "orange", horizontal= TRUE)
+
+```
+
+```{r}
+# Distribution des Site médical où le patient est traité
+table_cont_site = table(site)
+print(table_cont_site)
+barplot(table_cont_site, main = "Distribution des Site médical où le patient est traité", col = c("brown3"))
+```
+
+
+
+
+####################################################################
+####################################################################
+# Description bivariée
+####################################################################
+####################################################################
+
+```{r} 
+# Corrélation entre Le cout du traitement et l'age du patient
+(corr = cor(lncost, age))
+
+```
+
+```{r}
+par(mfcol = c(2,2))
+boxplot(cost~site, main= "Boxplot Cout du traitement/Site", xlab = "Site",ylab = "Cout du traitement ", col="lightgreen")
+boxplot(cost~comp, main= "Boxplot Cout du traitement/Complication",xlab="Complication",ylab = "Cout du traitement ", col= "orange")
+```
+
+
+```{r}
+# Nuage des points des variables quantitatives
+plot(data[,c("age", "cost", "los", "attphys")])
+```
+
+
+
+```{r}
+#install.packages("corrplot")
+library(corrplot)
+correlation_matrix <- cor(data[,c("cost","age","time","los")])
+# HeatMap des corrélation
+corrplot(correlation_matrix, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45, addCoef.col = "black", 
+         number.cex = 0.7, number.digits = 2)
+```
+
+
+```{r}
+library(ggplot2)
+# Graphique de répartition par hypertension et par diabète
+# Tableau croisé de l'hypertension et du diabète
+cont_bp_diabetes = table(diabetes, bp)
+bp_diabetes_plot = ggplot(data, aes(x = diabetes, fill = bp)) +
+  geom_bar(position = "fill") +
+  labs(title = "Répartition par hypertension et par diabète", x = "Diabètes", y = "Hypertension") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set2")
+
+print(bp_diabetes_plot)
+```
+
+
+
+
+```{r}
+# Graphique de répartition par site médical où le patient est traité et par Résultat du traitement
+gen_res_plot = ggplot(data, aes(x = site, fill = result)) +
+  geom_bar(position = "fill") +
+  labs(title = "Répartition par site médical où le patient est traité et par Résultat du traitement ", x = "site", y = "Resultat") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1")
+
+# Afficher le graphique
+print(gen_res_plot)
+```
+
+
+
+
+
+####################################################################
+####################################################################
+# Model
+####################################################################
+####################################################################
+
+```{r}
+# data$comp = relevel(data$comp,ref="Non")
+model = lm(cost ~.,data=data[,c( "los", "proc", "comp", "time")])   # data$comp = relevel(data$comp,ref="Oui")
+summary(model)      
+```
+
+
+```{r}
+# coefficients standardisés
+library(lm.beta)
+lm.beta(model)
+```
+
+
+```{r}
+# Intervalle de confiance
+ic=confint(model , level = 0.95)
+	cbind(beta=coef(model),ic)
+```
+
+
+
+
+# H1: normalité
+```{r}
+layout(matrix(1:4,2,2))
+plot(model)
+```
+
+# H2: Nullité de l'espérance des erreurs L'hypothèse de nullité de l'espérance des erreurs suppose que la moyenne des résidus (erreurs de prédiction) est nulle. Nous pouvons vérifier cela en examinant la moyenne des résidus.
+```{r}
+moyenne_residus <- mean(residuals(model))
+moyenne_residus
+```
+
+### H3: Absence d'autocorrélation
+L'hypothèse d'absence d'autocorrélation suppose que les résidus ne sont pas corrélés les uns avec les autres. 
+
+Le test de Durbin-Watson permet de vérifier la présence d'autocorrélation positive ou négative des résidus dans un modèle de régression. Voici comment interpréter les résultats du test :
+
+Statistique de Durbin-Watson (DW) :
+
+- Si DW est proche de 2, cela suggère l'absence d'autocorrélation.
+- Si DW est significativement inférieur à 2, cela suggère une autocorrélation positive (les résidus sont corrélés positivement).
+- Si DW est significativement supérieur à 2, cela suggère une autocorrélation négative (les résidus sont corrélés négativement).
+```{r}
+library(lmtest)
+
+# Test de Durbin-Watson
+durbin_watson_test = dwtest(model)
+durbin_watson_test
+```
+# H4: homoscédasticité (égalité des variances) 
+```{r}
+install.packages("car")
+lmtest::bptest(model)
+car::ncvTest(model)  # Non-constant Variance Score Test
+```
+
+
+
+### H5: Absence de multicolinéarité
+```{r}
+library(car)
+vif(model) 
+```
+
+```{r}
+reg = lm(cost ~ age, data = data)
+summary(reg)
+```
+
